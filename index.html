@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>FLUX PRO MAX - AI Image Generator</title>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <style>
+        /* Copy semua style lama kamu, tambah ini aja */
+        .upload-area {
+            border: 2px dashed #667eea;
+            border-radius: 12px;
+            padding: 20px;
+            text-align: center;
+            background: #f8f9ff;
+            cursor: pointer;
+            transition: all 0.3s;
+            margin: 15px 0;
+        }
+        .upload-area:hover {
+            background: #eef0ff;
+            border-color: #764ba2;
+        }
+        .upload-area.dragover {
+            background: #e0e7ff;
+            border-color: #667eea;
+        }
+        #imagePreview {
+            max-width: 100%;
+            max-height: 300px;
+            margin-top: 15px;
+            border-radius: 8px;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>FLUX PRO MAX</h1>
+        
+        <div class="prompt-section">
+            <div class="section-title">Positive Prompt</div>
+            <textarea id="positivePrompt" placeholder="A photorealistic portrait of a woman with blue eyes..."></textarea>
+        </div>
+        
+        <div class="prompt-section">
+            <div class="section-title">Negative Prompt</div>
+            <textarea id="negativePrompt" placeholder="blurry, deformed, ugly, bad anatomy, watermark..."></textarea>
+        </div>
+
+        <!-- Upload Gambar Referensi -->
+        <div class="prompt-section">
+            <div class="section-title">Reference Image (Optional)</div>
+            <div class="section-subtitle">Upload pose, face, style, or anything you want to keep</div>
+            <div class="upload-area" id="dropArea">
+                <p>Drag & drop image here or click to upload</p>
+                <input type="file" id="imageInput" accept="image/*" style="display:none">
+                <img id="imagePreview" src="" alt="Preview">
+            </div>
+        </div>
+        
+        <div class="input-group">
+            <button id="generateBtn" onclick="generateImage()">Generate with FLUX</button>
+        </div>
+        
+        <div id="result"></div>
+    </div>
+
+    <script>
+        // GANTI DENGAN URL WORKER BARU KAMU
+        const WORKER_URL = 'https://flux-pro-max.ipanutomo.workers.dev';
+
+        const dropArea = document.getElementById('dropArea');
+        const imageInput = document.getElementById('imageInput');
+        const imagePreview = document.getElementById('imagePreview');
+
+        // Drag & drop
+        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
+            dropArea.addEventListener(event, e => {
+                e.preventDefault();
+                e.stopPropagation();
+            });
+        });
+        ['dragenter', 'dragover'].forEach(event => {
+            dropArea.addEventListener(event, () => dropArea.classList.add('dragover'));
+        });
+        ['dragleave', 'drop'].forEach(event => {
+            dropArea.addEventListener(event, () => dropArea.classList.remove('dragover'));
+        });
+        dropArea.addEventListener('drop', e => {
+            const file = e.dataTransfer.files[0];
+            if (file && file.type.startsWith('image/')) {
+                handleFile(file);
+            }
+        });
+        dropArea.addEventListener('click', () => imageInput.click());
+        imageInput.addEventListener('change', e => {
+            if (e.target.files[0]) handleFile(e.target.files[0]);
+        });
+
+        function handleFile(file) {
+            const reader = new FileReader();
+            reader.onload = e => {
+                imagePreview.src = e.target.result;
+                imagePreview.style.display = 'block';
+                dropArea.querySelector('p').textContent = file.name;
+            };
+            reader.readAsDataURL(file);
+        }
+
+        async function generateImage() {
+            const positive = document.getElementById('positivePrompt').value.trim();
+            const negative = document.getElementById('negativePrompt').value.trim();
+            const resultDiv = document.getElementById('result');
+            const btn = document.getElementById('generateBtn');
+
+            if (!positive) return alert('Positive prompt wajib!');
+
+            btn.disabled = true;
+            btn.textContent = 'Generating... (28 steps)';
+            resultDiv.innerHTML = '<div class="loading">Please wait 15-40 seconds for FLUX.1-dev magic...</div>';
+
+            const form = new FormData();
+            form.append('prompt', positive);
+            if (negative) form.append('negative', negative);
+            if (imageInput.files[0]) form.append('image', imageInput.files[0]);
+
+            try {
+                const res = await fetch(WORKER_URL, {
+                    method: 'POST',
+                    body: form
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || 'Server error');
+                }
+
+                const blob = await res.blob();
+                const url = URL.createObjectURL(blob);
+
+                resultDiv.innerHTML = `
+                    <h3>Generated Successfully!</h3>
+                    <img src="${url}" class="generated-image">
+                    <br>
+                    <a href="${url}" download="flux-pro-${Date.now()}.png" class="download-btn">
+                        Download Full Resolution
+                    </a>
+                    <div style="margin-top:15px; font-size:0.9em; color:#666;">
+                        Model: FLUX.1-${imageInput.files[0] ? 'dev (img2img)' : 'schnell'} 
+                        ${negative ? '<br>Negative prompt applied' : ''}
+                    </div>
+                `;
+
+            } catch (e) {
+                resultDiv.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+            } finally {
+                btn.disabled = false;
+                btn.textContent = 'Generate with FLUX';
+            }
+        }
+
+        // Ctrl+Enter
+        document.addEventListener('keydown', e => {
+            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generateImage();
+        });
+    </script>
+</body>
+</html>
