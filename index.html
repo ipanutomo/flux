@@ -1,168 +1,96 @@
 <!DOCTYPE html>
 <html>
 <head>
-    <title>FLUX PRO MAX - AI Image Generator</title>
+    <title>AI Image Generator Pro</title>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <style>
-        /* Copy semua style lama kamu, tambah ini aja */
-        .upload-area {
-            border: 2px dashed #667eea;
-            border-radius: 12px;
-            padding: 20px;
-            text-align: center;
-            background: #f8f9ff;
-            cursor: pointer;
-            transition: all 0.3s;
-            margin: 15px 0;
-        }
-        .upload-area:hover {
-            background: #eef0ff;
-            border-color: #764ba2;
-        }
-        .upload-area.dragover {
-            background: #e0e7ff;
-            border-color: #667eea;
-        }
-        #imagePreview {
-            max-width: 100%;
-            max-height: 300px;
-            margin-top: 15px;
-            border-radius: 8px;
-            display: none;
-        }
+        *{margin:0;padding:0;box-sizing:border-box}
+        body{font-family:'Segoe UI',sans-serif;background:linear-gradient(135deg,#667eea,#764ba2);min-height:100vh;padding:20px}
+        .container{max-width:900px;margin:0 auto;background:white;border-radius:15px;padding:30px;box-shadow:0 10px 30px rgba(0,0,0,.2)}
+        h1{text-align:center;color:#333;margin-bottom:30px;font-size:2.5em}
+        textarea{width:100%;padding:15px;border:2px solid #ddd;border-radius:8px;font-size:16px;resize:vertical;min-height:80px}
+        textarea:focus{outline:none;border-color:#667eea}
+        button{padding:15px 25px;background:#667eea;color:white;border:none;border-radius:8px;font-size:16px;cursor:pointer}
+        button:disabled{opacity:0.6;cursor:not-allowed}
+        .loading{color:#667eea;font-size:18px;padding:20px}
+        .error{color:#e74c3c;background:#fdf0f0;padding:15px;border-radius:8px;border-left:4px solid #e74c3c}
+        .generated-image{max-width:100%;border-radius:8px;box-shadow:0 5px 15px rgba(0,0,0,.1)}
+        .chip{background:#e9ecef;padding:6px 14px;border-radius:20px;font-size:0.9em;cursor:pointer;margin:5px}
     </style>
 </head>
 <body>
-    <div class="container">
-        <h1>FLUX PRO MAX</h1>
-        
-        <div class="prompt-section">
-            <div class="section-title">Positive Prompt</div>
-            <textarea id="positivePrompt" placeholder="A photorealistic portrait of a woman with blue eyes..."></textarea>
-        </div>
-        
-        <div class="prompt-section">
-            <div class="section-title">Negative Prompt</div>
-            <textarea id="negativePrompt" placeholder="blurry, deformed, ugly, bad anatomy, watermark..."></textarea>
-        </div>
+<div class="container">
+    <h1>AI Image Generator Pro</h1>
 
-        <!-- Upload Gambar Referensi -->
-        <div class="prompt-section">
-            <div class="section-title">Reference Image (Optional)</div>
-            <div class="section-subtitle">Upload pose, face, style, or anything you want to keep</div>
-            <div class="upload-area" id="dropArea">
-                <p>Drag & drop image here or click to upload</p>
-                <input type="file" id="imageInput" accept="image/*" style="display:none">
-                <img id="imagePreview" src="" alt="Preview">
-            </div>
-        </div>
-        
-        <div class="input-group">
-            <button id="generateBtn" onclick="generateImage()">Generate with FLUX</button>
-        </div>
-        
-        <div id="result"></div>
+    <div style="margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Positive Prompt</div>
+        <textarea id="positive" placeholder="snow cat, white fur, blue eyes, winter forest..."></textarea>
     </div>
 
-    <script>
-        // GANTI DENGAN URL WORKER BARU KAMU
-        const WORKER_URL = 'https://flux-pro-max.ipanutomo.workers.dev';
+    <div style="margin-bottom:20px">
+        <div style="font-weight:600;margin-bottom:8px">Negative Prompt (optional)</div>
+        <textarea id="negative" placeholder="blurry, ugly, deformed, watermark..."></textarea>
+    </div>
 
-        const dropArea = document.getElementById('dropArea');
-        const imageInput = document.getElementById('imageInput');
-        const imagePreview = document.getElementById('imagePreview');
+    <div style="margin-bottom:20px">
+        <div class="chip" onclick="document.getElementById('positive').value='cyberpunk cat with neon glasses';document.getElementById('negative').value='blurry, ugly'">Cyber Cat</div>
+        <div class="chip" onclick="document.getElementById('positive').value='snow cat';document.getElementById('negative').value=''">Snow Cat</div>
+        <div class="chip" onclick="document.getElementById('positive').value='anime girl cat ears';document.getElementById('negative').value='realistic, photo'">Anime Cat</div>
+    </div>
 
-        // Drag & drop
-        ['dragenter', 'dragover', 'dragleave', 'drop'].forEach(event => {
-            dropArea.addEventListener(event, e => {
-                e.preventDefault();
-                e.stopPropagation();
+    <button id="btn" onclick="generate()">Generate with SD3 Unlimited</button>
+    <div id="result"></div>
+</div>
+
+<script>
+    const WORKER_URL = 'https://sd3-unlimited.ipanutomo.workers.dev';  // PASTIKAN INI BENAR
+
+    async function generate() {
+        const pos = document.getElementById('positive').value.trim();
+        const neg = document.getElementById('negative').value.trim();
+        const btn = document.getElementById('btn');
+        const result = document.getElementById('result');
+
+        if (!pos) return alert('Positive prompt wajib!');
+
+        btn.disabled = true;
+        btn.textContent = 'Generating... (8-15 detik)';
+        result.innerHTML = '<div class="loading">SD3 sedang melukis...</div>';
+
+        const form = new FormData();
+        form.append('prompt', pos);
+        if (neg) form.append('negative', neg);
+
+        try {
+            const res = await fetch(WORKER_URL, {
+                method: 'POST',
+                body: form
             });
-        });
-        ['dragenter', 'dragover'].forEach(event => {
-            dropArea.addEventListener(event, () => dropArea.classList.add('dragover'));
-        });
-        ['dragleave', 'drop'].forEach(event => {
-            dropArea.addEventListener(event, () => dropArea.classList.remove('dragover'));
-        });
-        dropArea.addEventListener('drop', e => {
-            const file = e.dataTransfer.files[0];
-            if (file && file.type.startsWith('image/')) {
-                handleFile(file);
+
+            if (!res.ok) {
+                const err = await res.json();
+                throw new Error(err.error || 'Server error');
             }
-        });
-        dropArea.addEventListener('click', () => imageInput.click());
-        imageInput.addEventListener('change', e => {
-            if (e.target.files[0]) handleFile(e.target.files[0]);
-        });
 
-        function handleFile(file) {
-            const reader = new FileReader();
-            reader.onload = e => {
-                imagePreview.src = e.target.result;
-                imagePreview.style.display = 'block';
-                dropArea.querySelector('p').textContent = file.name;
-            };
-            reader.readAsDataURL(file);
+            const blob = await res.blob();
+            const url = URL.createObjectURL(blob);
+
+            result.innerHTML = `
+                <img src="${url}" class="generated-image">
+                <br><br>
+                <a href="${url}" download="sd3-${Date.now()}.png" style="background:#27ae60;color:white;padding:10px 20px;border-radius:5px;text-decoration:none">
+                    Download 1024×1024
+                </a>
+            `;
+
+        } catch (e) {
+            result.innerHTML = `<div class="error">Error: ${e.message}</div>`;
+        } finally {
+            btn.disabled = false;
+            btn.textContent = 'Generate with SD3 Unlimited';
         }
-
-        async function generateImage() {
-            const positive = document.getElementById('positivePrompt').value.trim();
-            const negative = document.getElementById('negativePrompt').value.trim();
-            const resultDiv = document.getElementById('result');
-            const btn = document.getElementById('generateBtn');
-
-            if (!positive) return alert('Positive prompt wajib!');
-
-            btn.disabled = true;
-            btn.textContent = 'Generating... (28 steps)';
-            resultDiv.innerHTML = '<div class="loading">Please wait 15-40 seconds for FLUX.1-dev magic...</div>';
-
-            const form = new FormData();
-            form.append('prompt', positive);
-            if (negative) form.append('negative', negative);
-            if (imageInput.files[0]) form.append('image', imageInput.files[0]);
-
-            try {
-                const res = await fetch(WORKER_URL, {
-                    method: 'POST',
-                    body: form
-                });
-
-                if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || 'Server error');
-                }
-
-                const blob = await res.blob();
-                const url = URL.createObjectURL(blob);
-
-                resultDiv.innerHTML = `
-                    <h3>Generated Successfully!</h3>
-                    <img src="${url}" class="generated-image">
-                    <br>
-                    <a href="${url}" download="flux-pro-${Date.now()}.png" class="download-btn">
-                        Download Full Resolution
-                    </a>
-                    <div style="margin-top:15px; font-size:0.9em; color:#666;">
-                        Model: FLUX.1-${imageInput.files[0] ? 'dev (img2img)' : 'schnell'} 
-                        ${negative ? '<br>Negative prompt applied' : ''}
-                    </div>
-                `;
-
-            } catch (e) {
-                resultDiv.innerHTML = `<div class="error">Error: ${e.message}</div>`;
-            } finally {
-                btn.disabled = false;
-                btn.textContent = 'Generate with FLUX';
-            }
-        }
-
-        // Ctrl+Enter
-        document.addEventListener('keydown', e => {
-            if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') generateImage();
-        });
-    </script>
+    }
+</script>
 </body>
 </html>
