@@ -15,7 +15,7 @@
         button:disabled{opacity:0.6;cursor:not-allowed}
         .loading{color:#667eea;font-size:18px;padding:20px}
         .error{color:#e74c3c;background:#fdf0f0;padding:15px;border-radius:8px;border-left:4px solid #e74c3c}
-        .generated-image{max-width:100%;border-radius:8px;box-shadow:0 5px 15 0 rgba(0,0,0,.1)}
+        .generated-image{max-width:100%;border-radius:8px;box-shadow:0 5px 15px rgba(0,0,0,.1)}
         .chip{background:#e9ecef;padding:8px 16px;border-radius:30px;font-size:0.9em;cursor:pointer;margin:5px;display:inline-block}
     </style>
 </head>
@@ -25,7 +25,7 @@
 
     <div style="margin-bottom:20px">
         <div style="font-weight:600;margin-bottom:8px">Positive Prompt</div>
-        <textarea id="positive" placeholder="blue cat with orange sunglasses, cyberpunk city, neon lights..."></textarea>
+        <textarea id="positive" placeholder="cyberpunk cat with neon glasses, highly detailed..."></textarea>
     </div>
 
     <div style="margin-bottom:20px">
@@ -34,20 +34,20 @@
     </div>
 
     <div style="margin-bottom:20px">
-        <span class="chip" onclick="set('cyberpunk cat with neon glasses','blurry, ugly')">Cyber Cat</span>
-        <span class="chip" onclick="set('snow cat in winter forest','')">Snow Cat</span>
-        <span class="chip" onclick="set('anime girl with cat ears, kawaii, detailed eyes','realistic, photo')">Anime Cat Girl</span>
-        <span class="chip" onclick="set('indomie goreng with extra egg, realistic food photography','cartoon')">Indomie Legend</span>
+        <span class="chip" onclick="setPrompt('cyberpunk cat with neon glasses','blurry, ugly')">Cyber Cat</span>
+        <span class="chip" onclick="setPrompt('snow cat in winter forest','')">Snow Cat</span>
+        <span class="chip" onclick="setPrompt('anime girl with cat ears, kawaii style','realistic, photo')">Anime Cat Girl</span>
+        <span class="chip" onclick="setPrompt('indomie goreng with extra egg, realistic food photo','cartoon, blurry')">Indomie Legend</span>
     </div>
 
-    <button id="btn" onclick="generate()">Generate with SD3 Unlimited</button>
+    <button id="btn" onclick="generate()">Generate with Playground v2.5</button>
     <div id="result"></div>
 </div>
 
 <script>
     const WORKER_URL = 'https://sd3-unlimited.ipanutomo.workers.dev';
     
-    function set(pos, neg) {
+    function setPrompt(pos, neg) {
         document.getElementById('positive').value = pos;
         document.getElementById('negative').value = neg;
     }
@@ -61,38 +61,37 @@
         if (!pos) return alert('Prompt harus diisi!');
 
         btn.disabled = true;
-        btn.textContent = 'SD3 lagi melukis... (8-15 detik)';
-        result.innerHTML = '<div class="loading">Sedang generate gambar 1024×1024...</div>';
+        btn.textContent = 'Generating... (10-15 detik)';
+        result.innerHTML = '<div class="loading">Playground v2.5 sedang melukis aesthetic art...</div>';
 
-        const form = new FormData();
-        form.append('prompt', pos);
-        if (neg) form.append('negative', neg);
+        // FIX: Kirim sebagai JSON biar ga ribet header (worker tetep nerima sebagai form, tapi fallback JSON)
+        const payload = { prompt: pos + (neg ? ` --no ${neg}` : "") };
+        const res = await fetch(WORKER_URL, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },  // Tambah ini biar aman
+            body: JSON.stringify(payload)
+        });
 
-        try {
-            const res = await fetch(WORKER_URL, { method: 'POST', body: form });
-            if (!res.ok) {
-                const err = await res.json();
-                throw new Error(err.error || 'Server error');
-            }
-            const blob = await res.blob();
-            const url = URL.createObjectURL(blob);
-            result.innerHTML = `
-                <img src="${url}" class="generated-image">
-                <br><br>
-                <a href="${url}" download="ai-${Date.now()}.png" style="background:#27ae60;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
-                    Download 1024×1024
-                </a>
-                <p style="margin-top:15px;color:#666;font-size:0.9em">
-                    Prompt: ${pos}<br>
-                    ${neg ? 'Negative: ' + neg : ''}
-                </p>
-            `;
-        } catch (e) {
-            result.innerHTML = `<div class="error">Error: ${e.message}</div>`;
-        } finally {
-            btn.disabled = false;
-            btn.textContent = 'Generate with SD3 Unlimited';
+        if (!res.ok) {
+            const err = await res.json();
+            throw new Error(err.error || 'Server error');
         }
+
+        const blob = await res.blob();
+        const url = URL.createObjectURL(blob);
+        result.innerHTML = `
+            <img src="${url}" class="generated-image">
+            <br><br>
+            <a href="${url}" download="playground-${Date.now()}.png" style="background:#27ae60;color:white;padding:12px 24px;border-radius:8px;text-decoration:none;font-weight:bold">
+                Download 1024×1024
+            </a>
+            <p style="margin-top:15px;color:#666;font-size:0.9em">
+                Prompt: ${pos}<br>
+                ${neg ? 'Negative: ' + neg : ''}
+            </p>
+        `;
+        btn.disabled = false;
+        btn.textContent = 'Generate with Playground v2.5';
     }
 </script>
 </body>
